@@ -4,7 +4,7 @@ import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { redirect } from "next/navigation";
 
 export default async function OnboardingPage() {
-  const cookiesList = await cookies();
+  const cookiesList = cookies();
   const supabase = createServerComponentClient({ cookies: () => cookiesList });
 
   const {
