@@ -4,60 +4,98 @@ import type { NextRequest } from "next/server";
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req, res });
+  const url = req.nextUrl.clone();
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  // Check if the user is authenticated
-  if (!session) {
-    // If the user is not authenticated and trying to access a protected route
+  // Mock auth handling - only in development
+  if (
+    process.env.NODE_ENV === "development" &&
+    process.env.NEXT_PUBLIC_MOCK_AUTH === "true"
+  ) {
+    console.log("Using mock authentication");
     if (
-      req.nextUrl.pathname.startsWith("/dashboard") ||
-      req.nextUrl.pathname.startsWith("/onboarding")
+      req.nextUrl.pathname === "/login" ||
+      req.nextUrl.pathname === "/register"
     ) {
-      const redirectUrl = new URL("/login", req.url);
-      redirectUrl.searchParams.set("redirect", req.nextUrl.pathname);
-      return NextResponse.redirect(redirectUrl);
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
     }
     return res;
   }
 
-  // If the user is authenticated
-  if (session) {
-    // Check if the user has completed onboarding
-    const { data: profile } = await supabase
+  // Regular auth handling
+  const supabase = createMiddlewareClient({ req, res });
+
+  try {
+    // Verify both session and user
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (sessionError || userError || !session || !user) {
+      console.log("No valid session found", { sessionError, userError });
+
+      // Redirect to login if trying to access protected routes
+      if (
+        req.nextUrl.pathname.startsWith("/dashboard") ||
+        req.nextUrl.pathname.startsWith("/onboarding")
+      ) {
+        url.pathname = "/login";
+        url.searchParams.set("redirect", req.nextUrl.pathname);
+        return NextResponse.redirect(url);
+      }
+      return res;
+    }
+
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("onboarding_completed, first_name, last_name")
-      .eq("id", session.user.id)
+      .eq("id", user.id)
       .single();
+
+    if (profileError) {
+      console.error("Profile fetch error:", profileError);
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
 
     const needsOnboarding =
       !profile?.onboarding_completed ||
       !profile?.first_name ||
       !profile?.last_name;
 
-    // If the user needs onboarding and is not on the onboarding page
-    if (needsOnboarding && req.nextUrl.pathname !== "/onboarding") {
-      return NextResponse.redirect(new URL("/onboarding", req.url));
+    // Handle onboarding redirection
+    if (needsOnboarding && !req.nextUrl.pathname.startsWith("/onboarding")) {
+      url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
     }
 
-    // If the user has completed onboarding and is trying to access the onboarding page
-    if (!needsOnboarding && req.nextUrl.pathname === "/onboarding") {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+    if (!needsOnboarding && req.nextUrl.pathname.startsWith("/onboarding")) {
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
     }
 
-    // If the user is authenticated and trying to access login or register pages
+    // Redirect away from auth pages if authenticated
     if (
-      req.nextUrl.pathname === "/login" ||
-      req.nextUrl.pathname === "/register"
+      (req.nextUrl.pathname === "/login" ||
+        req.nextUrl.pathname === "/register") &&
+      !needsOnboarding
     ) {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
     }
-  }
 
-  return res;
+    return res;
+  } catch (error) {
+    console.error("Middleware error:", error);
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
 }
 
 export const config = {

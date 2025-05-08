@@ -1,27 +1,38 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Textarea } from "@/components/ui/textarea"
-import { useCurrentUser } from "@/hooks/use-current-user"
-import { supabase } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
-import { toast } from "@/components/ui/use-toast"
-import { motion, AnimatePresence } from "framer-motion"
-import { BookOpen, User, GraduationCap, School, CheckCircle } from "lucide-react"
-import { ProfileImageUpload } from "@/components/profile/profile-image-upload"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { supabase } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { toast } from "@/components/ui/use-toast";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  BookOpen,
+  User,
+  GraduationCap,
+  School,
+  CheckCircle,
+} from "lucide-react";
+import { ProfileImageUpload } from "@/components/profile/profile-image-upload";
 
 export function UserOnboarding() {
-  const { user, refreshProfile } = useCurrentUser()
-  const router = useRouter()
-  const [step, setStep] = useState(1)
-  const [loading, setLoading] = useState(false)
+  const { user, refreshProfile } = useCurrentUser();
+  const router = useRouter();
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -30,16 +41,20 @@ export function UserOnboarding() {
     student_id: "",
     department: "",
     interests: "",
-  })
+  });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
+  const isMockMode = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleRoleChange = (value: string) => {
-    setFormData((prev) => ({ ...prev, role: value }))
-  }
+    setFormData((prev) => ({ ...prev, role: value }));
+  };
 
   const handleNext = () => {
     if (step === 1 && (!formData.first_name || !formData.last_name)) {
@@ -47,8 +62,8 @@ export function UserOnboarding() {
         title: "Required fields",
         description: "Please fill in your first and last name",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     if (step === 2 && formData.role === "student" && !formData.student_id) {
@@ -56,22 +71,28 @@ export function UserOnboarding() {
         title: "Student ID required",
         description: "Please enter your student ID",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setStep((prev) => prev + 1)
-  }
+    setStep((prev) => prev + 1);
+  };
 
   const handleBack = () => {
-    setStep((prev) => prev - 1)
-  }
+    setStep((prev) => prev - 1);
+  };
 
   const handleSubmit = async () => {
-    if (!user) return
+    if (!user) return;
 
     try {
-      setLoading(true)
+      setLoading(true);
+
+      if (isMockMode) {
+        // In mock mode, just redirect without saving
+        router.push("/dashboard");
+        return;
+      }
 
       // Update user profile
       const { error } = await supabase
@@ -86,40 +107,42 @@ export function UserOnboarding() {
           interests: formData.interests,
           onboarding_completed: true,
         })
-        .eq("id", user.id)
+        .eq("id", user.id);
 
-      if (error) throw error
+      if (error) throw error;
 
       // Create welcome notification
       await supabase.from("notifications").insert({
         user_id: user.id,
         title: "Welcome to EduTrack!",
-        message: "Thank you for completing your profile. Get started by exploring your dashboard.",
+        message:
+          "Thank you for completing your profile. Get started by exploring your dashboard.",
         type: "welcome",
         read: false,
-      })
+      });
 
       // Refresh profile data
-      await refreshProfile()
+      await refreshProfile();
 
       toast({
         title: "Profile completed",
-        description: "Your profile has been set up successfully. Welcome to EduTrack!",
-      })
+        description:
+          "Your profile has been set up successfully. Welcome to EduTrack!",
+      });
 
       // Redirect to dashboard
-      router.push("/dashboard")
+      router.push("/dashboard");
     } catch (error: any) {
-      console.error("Error updating profile:", error.message)
+      console.error("Error updating profile:", error.message);
       toast({
         title: "Error",
         description: error.message || "Failed to complete onboarding",
         variant: "destructive",
-      })
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const steps = [
     {
@@ -147,7 +170,7 @@ export function UserOnboarding() {
       description: "You're ready to get started",
       icon: <CheckCircle className="h-6 w-6" />,
     },
-  ]
+  ];
 
   return (
     <div className="container max-w-md mx-auto py-10">
@@ -158,8 +181,17 @@ export function UserOnboarding() {
           </div>
         </div>
         <h1 className="text-2xl font-bold">Welcome to EduTrack</h1>
-        <p className="text-muted-foreground">Let's set up your profile to get started</p>
+        <p className="text-muted-foreground">
+          Let's set up your profile to get started
+        </p>
       </div>
+
+      {isMockMode && (
+        <div className="mb-4 p-4 bg-yellow-100 text-yellow-800 rounded-md">
+          <p className="font-medium">Mock Mode Active</p>
+          <p className="text-sm">No data will be saved to the database.</p>
+        </div>
+      )}
 
       <div className="mb-8">
         <div className="flex justify-between items-center">
@@ -167,7 +199,11 @@ export function UserOnboarding() {
             <div
               key={i}
               className={`flex flex-col items-center ${
-                i + 1 === step ? "text-primary" : i + 1 < step ? "text-primary/70" : "text-muted-foreground"
+                i + 1 === step
+                  ? "text-primary"
+                  : i + 1 < step
+                  ? "text-primary/70"
+                  : "text-muted-foreground"
               }`}
             >
               <div
@@ -175,8 +211,8 @@ export function UserOnboarding() {
                   i + 1 === step
                     ? "bg-primary text-primary-foreground"
                     : i + 1 < step
-                      ? "bg-primary/20 text-primary"
-                      : "bg-muted text-muted-foreground"
+                    ? "bg-primary/20 text-primary"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
                 {i + 1 < step ? <CheckCircle className="h-4 w-4" /> : i + 1}
@@ -284,7 +320,12 @@ export function UserOnboarding() {
 
                   <div className="space-y-2">
                     <Label htmlFor="department">Department/Faculty</Label>
-                    <Input id="department" name="department" value={formData.department} onChange={handleChange} />
+                    <Input
+                      id="department"
+                      name="department"
+                      value={formData.department}
+                      onChange={handleChange}
+                    />
                   </div>
                 </div>
               )}
@@ -318,7 +359,7 @@ export function UserOnboarding() {
 
               {step === 4 && (
                 <div className="space-y-4 flex justify-center py-4">
-                  <ProfileImageUpload />
+                  <ProfileImageUpload mockMode={isMockMode} />
                 </div>
               )}
 
@@ -332,7 +373,9 @@ export function UserOnboarding() {
                   <div>
                     <h3 className="text-lg font-medium">You're all set!</h3>
                     <p className="text-muted-foreground">
-                      Thank you for completing your profile. Click "Complete" to start using EduTrack.
+                      {isMockMode
+                        ? "In mock mode, no data was saved."
+                        : "Thank you for completing your profile. Click 'Complete' to start using EduTrack."}
                     </p>
                   </div>
                 </div>
@@ -341,7 +384,11 @@ export function UserOnboarding() {
           </AnimatePresence>
         </CardContent>
         <CardFooter className="flex justify-between">
-          <Button variant="outline" onClick={handleBack} disabled={step === 1 || loading}>
+          <Button
+            variant="outline"
+            onClick={handleBack}
+            disabled={step === 1 || loading}
+          >
             Back
           </Button>
           {step < steps.length ? (
@@ -354,5 +401,5 @@ export function UserOnboarding() {
         </CardFooter>
       </Card>
     </div>
-  )
+  );
 }
